@@ -235,6 +235,7 @@ body{background:var(--bg);font-family:var(--f-body);color:var(--dark);min-height
 const MONTHS_KO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const MONTHS_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOWS=['일','월','화','수','목','금','토'];
+const STORAGE_KEY='letsmeet_state_v1';
 
 let state={
   profiles:[
@@ -252,6 +253,34 @@ let state={
 };
 
 function gid(id){return document.getElementById(id);}
+
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  }catch(e){
+    console.warn('상태 저장 실패',e);
+  }
+}
+
+function loadState(){
+  try{
+    var raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    var parsed=JSON.parse(raw);
+    if(!parsed||typeof parsed!=='object')return;
+    state={
+      profiles:Array.isArray(parsed.profiles)?parsed.profiles:state.profiles,
+      votes:parsed.votes&&typeof parsed.votes==='object'?parsed.votes:{},
+      proposals:Array.isArray(parsed.proposals)?parsed.proposals:[],
+      activeMember:parsed.activeMember||null,
+      currentMonth:Number.isInteger(parsed.currentMonth)?parsed.currentMonth:new Date().getMonth(),
+      currentYear:Number.isInteger(parsed.currentYear)?parsed.currentYear:new Date().getFullYear(),
+      confirmedDate:parsed.confirmedDate||null,
+    };
+  }catch(e){
+    console.warn('상태 복원 실패',e);
+  }
+}
 
 function showPage(p){
   document.querySelectorAll('.page').forEach(function(el){el.classList.remove('active');});
@@ -296,6 +325,7 @@ function addProfile(){
   if(!n)return;
   var emoji=emojiRaw||'😊';
   state.profiles.push({id:Date.now(),name:n,emoji:emoji,addr:a||'미입력'});
+  saveState();
   closeModal('addProfile');
   renderProfiles();
   renderAll();
@@ -306,6 +336,7 @@ function addProposal(){
   var a=(gid('inp-placeArea').value||'').trim();
   if(!n)return;
   state.proposals.push({id:Date.now(),name:n,area:a||'미정',voters:[]});
+  saveState();
   closeModal('addPlace');
   renderProposals();
 }
@@ -314,6 +345,7 @@ function deleteProfile(id,e){
   e.stopPropagation();
   state.profiles=state.profiles.filter(function(p){return p.id!==id;});
   if(state.activeMember===id)state.activeMember=null;
+  saveState();
   renderProfiles();
   renderAll();
 }
@@ -343,7 +375,7 @@ function renderMembers(){
     var d=document.createElement('div');
     d.className='member-chip'+(isActive?' active':'');
     d.innerHTML='<span class="chip-emoji">'+p.emoji+'</span><span class="chip-name">'+p.name+'</span>';
-    d.onclick=function(){state.activeMember=isActive?null:p.id;renderAll();};
+    d.onclick=function(){state.activeMember=isActive?null:p.id;saveState();renderAll();};
     row.appendChild(d);
   });
   var add=document.createElement('div');
@@ -393,6 +425,7 @@ function renderCalendar(){
         if(!state.votes[key])state.votes[key]=[];
         var idx=state.votes[key].indexOf(id);
         if(idx>-1)state.votes[key].splice(idx,1);else state.votes[key].push(id);
+        saveState();
         renderAll();
       };
       days.appendChild(el);
@@ -436,6 +469,7 @@ function renderVoteList(){
       (function(capturedYr, capturedMIdx, capturedD){
         row.onclick=function(){
           state.confirmedDate=capturedYr+'년 '+(capturedMIdx+1)+'월 '+capturedD+'일';
+          saveState();
           gid('confirmedDateLabel').textContent=state.confirmedDate;
           showPage('place');
         };
@@ -474,6 +508,7 @@ function renderProposals(){
 function deleteProposal(id,e){
   e.stopPropagation();
   state.proposals=state.proposals.filter(function(p){return p.id!==id;});
+  saveState();
   renderProposals();
 }
 
@@ -484,6 +519,7 @@ function votePlace(id,e){
   var myId=state.activeMember||(state.profiles[0]?state.profiles[0].id:1);
   var i=p.voters.indexOf(myId);
   if(i>-1)p.voters.splice(i,1);else p.voters.push(myId);
+  saveState();
   renderProposals();
 }
 
@@ -491,9 +527,11 @@ function changeMonth(dir){
   state.currentMonth+=dir;
   if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}
   if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}
+  saveState();
   renderAll();
 }
 
+loadState();
 renderBreadcrumb('home');
 renderAll();
 </script>
